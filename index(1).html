@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timeline Timer</title>
+<style>
+  :root {
+    --bg: #e9eef2;
+    --panel: #f6f9fb;
+    --ink: #12263a;
+    --muted: #5b6e7f;
+    --track: #c5d1da;
+    --fill: #8aa3b5;
+    --chip: #ffffff;
+    --line: #b3c2ce;
+    --red: #c81d2e;
+    --blue: #1a56c4;
+    --green: #0f7a43;
+    --on-color: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1a24;
+      --panel: #16242f;
+      --ink: #e6eef5;
+      --muted: #93a5b4;
+      --track: #2a3d4c;
+      --fill: #55718a;
+      --chip: #1d2f3d;
+      --line: #3b5163;
+      --red: #ff6b78;
+      --blue: #6aa5ff;
+      --green: #4fd08a;
+      --on-color: #10161c;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-rounded, "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+  main { max-width: 1000px; margin: 0 auto; }
+
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 20px;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+  }
+
+  .clock {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px 32px;
+    margin-bottom: 20px;
+  }
+  .readout {
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(4.5rem, 16vw, 8.5rem);
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+  }
+  .readout small {
+    font-size: 0.28em;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0;
+    margin-left: 0.4em;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  button {
+    font: inherit;
+    font-weight: 600;
+    border: 2px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    min-height: 48px;
+  }
+  button:hover:not(:disabled) { background: var(--panel); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  .events {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 640px) {
+    .events { grid-template-columns: repeat(2, 1fr); }
+    .event-btn.green { grid-column: span 2; }
+  }
+  .event-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 1.3rem;
+    padding: 20px 12px;
+    min-height: 84px;
+    color: var(--on-color);
+  }
+  .event-btn.red  { background: var(--red);  border-color: var(--red); }
+  .event-btn.blue { background: var(--blue); border-color: var(--blue); }
+  .event-btn.green { background: var(--green); border-color: var(--green); }
+  .event-btn.red:hover:not(:disabled),
+  .event-btn.blue:hover:not(:disabled),
+  .event-btn.green:hover:not(:disabled) { filter: brightness(1.1); }
+  .event-btn:active:not(:disabled) { transform: scale(0.97); }
+  .event-btn svg { width: 22px; height: 32px; flex: none; fill: currentColor; }
+  .event-btn kbd {
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.8;
+    border: 1.5px solid currentColor;
+    border-radius: 5px;
+    padding: 0 6px;
+  }
+
+  .hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 12px; min-height: 1.3em; }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 8px 0;
+  }
+  .timeline {
+    position: relative;
+    min-width: 760px;
+    height: 292px;
+    margin: 0 36px;
+  }
+
+  /* gap brackets across the top */
+  .gap {
+    position: absolute;
+    top: 4px;
+    height: 34px;
+    border-left: 2px solid var(--line);
+    border-right: 2px solid var(--line);
+  }
+  .gap::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    border-top: 2px solid var(--line);
+  }
+  .gap span {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--chip);
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .track {
+    position: absolute;
+    left: 0; right: 0; top: 140px;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--track);
+  }
+  .fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    border-radius: 7px;
+    background: var(--fill);
+  }
+
+  /* green line marking where the timer was ended early */
+  .endline {
+    position: absolute;
+    top: 108px;
+    height: 78px;
+    width: 4px;
+    margin-left: -2px;
+    border-radius: 2px;
+    background: var(--green);
+    display: none;
+    pointer-events: none;
+  }
+
+  .tick {
+    position: absolute;
+    top: 250px;
+    width: 2px;
+    height: 7px;
+    background: var(--line);
+    transform: translateX(-1px);
+  }
+  .tick.major { height: 13px; }
+  .tick-label {
+    position: absolute;
+    top: 266px;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .tick-label.first { transform: translateX(-30%); }
+  .tick-label.last { transform: translateX(-70%); }
+
+  /* event markers: "in" arrows point down onto the track, "out" arrows point up at it */
+  .mark {
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 292px;
+    pointer-events: none;
+  }
+  .mark.red  { --c: var(--red); }
+  .mark.blue { --c: var(--blue); }
+  .mark.green { --c: var(--green); }
+  .mark .arrow {
+    position: absolute;
+    left: -11px;
+    width: 22px;
+    height: 32px;
+    fill: var(--c);
+  }
+  .mark.in .arrow  { top: 108px; }
+  .mark.out .arrow { top: 154px; }
+
+  .mark .badge {
+    position: absolute;
+    left: 0;
+    transform: translateX(-50%);
+    background: var(--chip);
+    color: var(--ink);
+    border: 2px solid var(--c);
+    border-radius: 8px;
+    padding: 1px 7px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .mark.in .badge  { top: 76px; }
+  .mark.in.lvl1 .badge  { top: 46px; }
+  .mark.out .badge { top: 190px; }
+  .mark.out.lvl1 .badge { top: 220px; }
+
+  .mark .stem {
+    position: absolute;
+    left: -1px;
+    width: 2px;
+    background: var(--c);
+    opacity: 0.5;
+  }
+  .mark.in .stem  { top: 68px;  height: 40px; }
+  .mark.out .stem { top: 186px; height: 36px; }
+
+  .gap.unused { border-left-color: var(--green); border-right-color: var(--green); }
+  .gap.unused::before { border-top-color: var(--green); border-top-style: dashed; }
+  .gap.unused span { border-color: var(--green); }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 0 0 20px;
+  }
+  @media (max-width: 640px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+  }
+  .stat {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .stat-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label { font-weight: 600; margin-top: 6px; }
+  .stat-note { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+
+  .results { margin-top: 24px; }
+  .results h2 { font-size: 1rem; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
+  td.dur { font-weight: 700; }
+  tr.total td { border-bottom: 0; font-weight: 700; }
+  .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: baseline;
+  }
+  .dot.red { background: var(--red); }
+  .dot.blue { background: var(--blue); }
+  .dot.green { background: var(--green); }
+  .dot.none { background: var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    button { transition: background 0.12s, transform 0.08s, filter 0.12s; }
+    .mark { animation: drop 0.18s ease-out; }
+    @keyframes drop { from { opacity: 0; } to { opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Timeline timer: 2:30</h1>
+
+  <section class="clock">
+    <div class="readout" id="readout" aria-label="Elapsed time">0:00<small>of 2:30</small></div>
+    <div class="controls">
+      <button id="endBtn" disabled>End timer</button>
+      <button id="undoBtn" disabled>Undo last mark</button>
+      <button id="resetBtn" disabled>Reset</button>
+      <button id="downloadBtn" disabled>Download JPEG</button>
+    </div>
+  </section>
+
+  <section class="events" aria-label="Event buttons">
+    <button class="event-btn red"  id="redIn"   data-color="red"  data-dir="in"  disabled>
+      <svg viewBox="0 0 22 32" aria-hidden="true"><path d="M8 0h6v17h8L11 32 0 17h8z"/></svg>
+      Red In
+    </button>
+    <button class="event-btn red"  id="redOut"  data-color="red"  data-dir="out">
+      <svg viewBox="0 0 22 32" aria-hidden="true"><path d="M8 32h6V15h8L11 0 0 15h8z"/></svg>
+      Red Out
+    </button>
+    <button class="event-btn blue" id="blueIn"  data-color="blue" data-dir="in"  disabled>
+      <svg viewBox="0 0 22 32" aria-hidden="true"><path d="M8 0h6v17h8L11 32 0 17h8z"/></svg>
+      Blue In
+    </button>
+    <button class="event-btn blue" id="blueOut" data-color="blue" data-dir="out">
+      <svg viewBox="0 0 22 32" aria-hidden="true"><path d="M8 32h6V15h8L11 0 0 15h8z"/></svg>
+      Blue Out
+    </button>
+    <button class="event-btn green" id="precision" data-color="green" data-dir="in" disabled>
+      <svg viewBox="0 0 22 32" aria-hidden="true"><path d="M8 0h6v17h8L11 32 0 17h8z"/></svg>
+      Precision
+    </button>
+  </section>
+
+  <p class="hint" id="hint">Press Red Out or Blue Out (or key 2 or 4) to start the timer.</p>
+
+  <div class="scroller" id="scroller">
+    <div class="timeline" id="timeline">
+      <div class="track"><div class="fill" id="fill"></div></div>
+      <div id="ticks"></div>
+      <div id="gaps"></div>
+      <div class="endline" id="endLine"></div>
+      <div id="marks"></div>
+    </div>
+  </div>
+
+  <section class="results" id="results" hidden>
+    <h2>Results</h2>
+    <div class="summary" id="summary"></div>
+    <table>
+      <thead><tr><th>Segment</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+(function () {
+  var TOTAL = 150; // seconds (2:30)
+
+  var $ = function (id) { return document.getElementById(id); };
+  var readout = $("readout"),
+      endBtn = $("endBtn"), downloadBtn = $("downloadBtn"), endLine = $("endLine"), undoBtn = $("undoBtn"), resetBtn = $("resetBtn"), hint = $("hint"),
+      fill = $("fill"), ticksEl = $("ticks"), gapsEl = $("gaps"), marksEl = $("marks"),
+      results = $("results"), resultsBody = $("resultsBody"), summaryEl = $("summary");
+  var eventBtns = Array.prototype.slice.call(document.querySelectorAll(".event-btn"));
+
+  var KEYS = { "1": ["red", "in"], "2": ["red", "out"], "3": ["blue", "in"], "4": ["blue", "out"], "5": ["green", "in"] };
+  var ARROW_DOWN = "M8 0h6v17h8L11 32 0 17h8z";
+  var ARROW_UP = "M8 32h6V15h8L11 0 0 15h8z";
+
+  var status = "idle";      // idle | running | done
+  var startedAt = 0;
+  var marks = [];           // { t: rounded seconds, color: "red"|"blue", dir: "in"|"out" }
+  var timerId = null;
+  var endT = TOTAL;         // when the timer stopped (seconds)
+  var endedEarly = false;
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function label(m) { return m.color === "green" ? "Precision" : cap(m.color) + " " + cap(m.dir); }
+  function fmt(s) {
+    var m = Math.floor(s / 60), r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+  function pct(s) { return (s / TOTAL * 100) + "%"; }
+
+  // Up arrows ("out") can start the timer or follow a down arrow.
+  // Down arrows ("in" and Precision) can only follow an up arrow.
+  function canMark(dir) {
+    if (status === "idle") return dir === "out";
+    if (status !== "running") return false;
+    var last = marks[marks.length - 1];
+    return last ? dir !== last.dir : dir === "out";
+  }
+
+  function refreshButtons() {
+    eventBtns.forEach(function (b) { b.disabled = !canMark(b.dataset.dir); });
+  }
+
+  function buildTicks() {
+    var html = "";
+    for (var s = 0; s <= TOTAL; s += 10) {
+      var major = s % 30 === 0;
+      html += '<div class="tick' + (major ? " major" : "") + '" style="left:' + pct(s) + '"></div>';
+      if (major) {
+        var cls = s === 0 ? " first" : (s === TOTAL ? " last" : "");
+        html += '<div class="tick-label' + cls + '" style="left:' + pct(s) + '">' + fmt(s) + "</div>";
+      }
+    }
+    ticksEl.innerHTML = html;
+  }
+
+  function renderMarks() {
+    var html = "";
+    var last = { "in": { t: -99, lvl: 1 }, "out": { t: -99, lvl: 1 } };
+    marks.forEach(function (m) {
+      // Stagger labels on the same side when marks are close together.
+      var prev = last[m.dir];
+      var lvl = (m.t - prev.t <= 9) ? 1 - prev.lvl : 0;
+      last[m.dir] = { t: m.t, lvl: lvl };
+
+      var path = m.dir === "in" ? ARROW_DOWN : ARROW_UP;
+      html += '<div class="mark ' + m.color + " " + m.dir + " lvl" + lvl + '" style="left:' + pct(m.t) + '">' +
+              (lvl ? '<div class="stem"></div>' : "") +
+              '<svg class="arrow" viewBox="0 0 22 32" aria-hidden="true"><path d="' + path + '"/></svg>' +
+              '<div class="badge">' + fmt(m.t) + "</div></div>";
+    });
+    marksEl.innerHTML = html;
+  }
+
+  function dot(m) {
+    return '<span class="dot ' + (m ? m.color : "none") + '"></span>';
+  }
+
+  function renderGaps() {
+    var pts = marks.map(function (m) {
+      return { t: m.t, name: label(m), m: m };
+    }).concat([{ t: endT, name: "End" }]);
+
+    var gapHtml = "", rows = "";
+    var mission = 0, pit = 0, missionCount = 0, pitCount = 0;
+
+    for (var i = 0; i < pts.length - 1; i++) {
+      var a = pts[i], b = pts[i + 1], len = b.t - a.t;
+      // An up arrow starts a Mission; a down arrow starts a Pit.
+      var type = a.m.dir === "out" ? "Mission" : "Pit";
+      if (type === "Mission") { mission += len; missionCount++; } else { pit += len; pitCount++; }
+
+      gapHtml += '<div class="gap" style="left:' + pct(a.t) + ";width:" + (len / TOTAL * 100) +
+                 '%"><span>' + len + "s</span></div>";
+      rows += "<tr><td>" + dot(a.m) + a.name + " to " + dot(b.m) + b.name + "</td><td>" + type +
+              "</td><td>" + fmt(a.t) + "</td><td>" + fmt(b.t) + '</td><td class="dur">' + len + " s</td></tr>";
+    }
+
+    // Unused Time: whatever is left after the green end timer line.
+    var unused = endedEarly ? TOTAL - endT : 0;
+    if (unused > 0) {
+      gapHtml += '<div class="gap unused" style="left:' + pct(endT) + ";width:" + (unused / TOTAL * 100) +
+                 '%"><span>' + unused + "s</span></div>";
+      rows += "<tr><td>" + dot(null) + "End timer to 2:30</td><td>Unused Time</td><td>" + fmt(endT) +
+              "</td><td>" + fmt(TOTAL) + '</td><td class="dur">' + unused + " s</td></tr>";
+    }
+
+    gapsEl.innerHTML = gapHtml;
+    resultsBody.innerHTML = rows +
+      '<tr class="total"><td>Total</td><td></td><td></td><td></td><td>' + TOTAL + " s</td></tr>";
+
+    var avg = pitCount ? Math.round(pit / pitCount * 10) / 10 : null;
+    function plural(n, w) { return n + " " + w + (n === 1 ? "" : "s"); }
+    function stat(value, name, note) {
+      return '<div class="stat"><div class="stat-value">' + value + '</div><div class="stat-label">' +
+             name + '</div><div class="stat-note">' + note + "</div></div>";
+    }
+    summaryEl.innerHTML =
+      stat(mission + " s", "Mission", plural(missionCount, "Mission")) +
+      stat(pit + " s", "Pit", plural(pitCount, "Pit")) +
+      stat(unused + " s", "Unused Time", endedEarly ? "after the green line" : "timer ran the full 2:30") +
+      stat(avg === null ? "none" : avg + " s", "Average Pit", avg === null ? "no Pits yet" : "across " + plural(pitCount, "Pit"));
+
+    results.hidden = false;
+  }
+
+  function clearGaps() {
+    endLine.style.display = "none";
+    gapsEl.innerHTML = "";
+    resultsBody.innerHTML = "";
+    summaryEl.innerHTML = "";
+    results.hidden = true;
+  }
+
+  function setReadout(s) {
+    readout.innerHTML = fmt(s) + "<small>of 2:30</small>";
+  }
+
+  function tick() {
+    var elapsed = (performance.now() - startedAt) / 1000;
+    if (elapsed >= TOTAL) { finish(); return; }
+    setReadout(Math.floor(elapsed));
+    fill.style.width = (elapsed / TOTAL * 100) + "%";
+  }
+
+  function start() {
+    marks = [];
+    renderMarks();
+    clearGaps();
+    status = "running";
+    startedAt = performance.now();
+    setReadout(0);
+    fill.style.width = "0%";
+    refreshButtons();
+    undoBtn.disabled = true;
+    endBtn.disabled = false;
+    downloadBtn.disabled = true;
+    resetBtn.disabled = false;
+    endedEarly = false;
+    endT = TOTAL;
+    timerId = setInterval(tick, 50);
+  }
+
+  function finish(early) {
+    clearInterval(timerId);
+    endT = early ? Math.min(TOTAL, Math.round((performance.now() - startedAt) / 1000)) : TOTAL;
+    endedEarly = !!early && endT < TOTAL;
+    status = "done";
+    setReadout(endT);
+    fill.style.width = pct(endT);
+    refreshButtons();
+    undoBtn.disabled = true;
+    endBtn.disabled = true;
+    downloadBtn.disabled = false;
+    resetBtn.disabled = false;
+    if (endedEarly) {
+      endLine.style.left = pct(endT);
+      endLine.style.display = "block";
+      hint.textContent = "Timer ended early at " + fmt(endT) + ". Seconds between each mark are shown on the timeline and in the table below it.";
+    } else {
+      hint.textContent = "Time is up. Seconds between each mark are shown on the timeline and in the table below it.";
+    }
+    renderGaps();
+    resetBtn.focus();
+  }
+
+  function addMark(color, dir) {
+    var m;
+    if (status === "idle") {
+      // Only Red Out or Blue Out can start the timer; the start is marked at 0:00.
+      if (!canMark(dir)) return;
+      start();
+      m = { t: 0, color: color, dir: dir };
+      marks.push(m);
+      renderMarks();
+      refreshButtons();
+      hint.textContent = "Started with " + label(m) + ". Down and up arrows now alternate.";
+      return;
+    }
+    if (!canMark(dir)) return;
+    var elapsed = (performance.now() - startedAt) / 1000;
+    m = { t: Math.min(TOTAL, Math.round(elapsed)), color: color, dir: dir };
+    marks.push(m);
+    renderMarks();
+    refreshButtons();
+    undoBtn.disabled = false;
+    hint.textContent = label(m) + " at " + fmt(m.t) + ".";
+  }
+
+  function undo() {
+    if (status !== "running" || marks.length < 2) return;
+    var removed = marks.pop();
+    renderMarks();
+    undoBtn.disabled = marks.length < 2;
+    refreshButtons();
+    hint.textContent = "Removed " + label(removed) + " at " + fmt(removed.t) + ".";
+  }
+
+  // ---------- JPEG export ----------
+  // Draws the timeline and results onto a canvas (always on a white background)
+  // so the image looks the same no matter which theme the page is using.
+  function analyze() {
+    var pts = marks.map(function (m) { return { t: m.t, m: m, name: label(m) }; })
+                   .concat([{ t: endT, name: "End" }]);
+    var segs = [], mission = 0, pit = 0, mc = 0, pc = 0;
+    for (var i = 0; i < pts.length - 1; i++) {
+      var a = pts[i], b = pts[i + 1], len = b.t - a.t;
+      var type = a.m.dir === "out" ? "Mission" : "Pit";
+      if (type === "Mission") { mission += len; mc++; } else { pit += len; pc++; }
+      segs.push({ a: a, b: b, len: len, type: type });
+    }
+    return {
+      segs: segs, mission: mission, pit: pit, mc: mc, pc: pc,
+      unused: endedEarly ? TOTAL - endT : 0,
+      avg: pc ? Math.round(pit / pc * 10) / 10 : null
+    };
+  }
+
+  function downloadImage() {
+    if (status !== "done") return;
+    var d = analyze();
+
+    var C = { ink: "#12263a", muted: "#5b6e7f", panel: "#f1f5f8", track: "#c5d1da", fill: "#8aa3b5",
+              line: "#b3c2ce", white: "#ffffff", red: "#c81d2e", blue: "#1a56c4", green: "#0f7a43" };
+    var FF = 'ui-rounded, "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif';
+    var S = 2, W = 1000, M = 32;
+    var rows = d.segs.length + (d.unused > 0 ? 1 : 0);
+    var tableTop = 520;
+    var H = tableTop + 36 + rows * 34 + 38 + M;
+
+    var cv = document.createElement("canvas");
+    cv.width = W * S;
+    cv.height = H * S;
+    var c = cv.getContext("2d");
+    c.scale(S, S);
+
+    function font(weight, size) { c.font = weight + " " + size + "px " + FF; }
+    function rr(x, y, w, h, r) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.arcTo(x + w, y, x + w, y + h, r);
+      c.arcTo(x + w, y + h, x, y + h, r);
+      c.arcTo(x, y + h, x, y, r);
+      c.arcTo(x, y, x + w, y, r);
+      c.closePath();
+    }
+    function text(str, x, y, color, align) {
+      c.fillStyle = color;
+      c.textAlign = align || "left";
+      c.fillText(str, x, y);
+    }
+    function colorOf(m) { return m ? C[m.color] : C.muted; }
+
+    // background
+    c.fillStyle = C.white;
+    c.fillRect(0, 0, W, H);
+
+    // title
+    font("700", 22);
+    text("Timeline timer: 2:30", M, 46, C.ink);
+    font("400", 14);
+    text(new Date().toLocaleString(), W - M, 46, C.muted, "right");
+    font("400", 15);
+    text(endedEarly ? "Timer ended early at " + fmt(endT) : "Timer ran the full 2:30", M, 68, C.muted);
+
+    // summary boxes
+    var stats = [
+      [d.mission + " s", "Mission", d.mc + (d.mc === 1 ? " Mission" : " Missions")],
+      [d.pit + " s", "Pit", d.pc + (d.pc === 1 ? " Pit" : " Pits")],
+      [d.unused + " s", "Unused Time", endedEarly ? "after the green line" : "timer ran the full 2:30"],
+      [d.avg === null ? "none" : d.avg + " s", "Average Pit", d.avg === null ? "no Pits yet" : "across " + d.pc + (d.pc === 1 ? " Pit" : " Pits")]
+    ];
+    var bw = (W - 2 * M - 3 * 12) / 4;
+    stats.forEach(function (st, i) {
+      var x = M + i * (bw + 12), y = 84;
+      c.fillStyle = C.panel; rr(x, y, bw, 92, 12); c.fill();
+      font("700", 30); text(st[0], x + 16, y + 40, C.ink);
+      font("700", 15); text(st[1], x + 16, y + 64, C.ink);
+      font("400", 13); text(st[2], x + 16, y + 82, C.muted);
+    });
+
+    // timeline panel
+    var py = 196;
+    c.fillStyle = C.panel; rr(M, py, W - 2 * M, 308, 14); c.fill();
+    var ox = M + 36, oy = py + 8, tw = W - 2 * M - 72;
+    function X(t) { return ox + t / TOTAL * tw; }
+
+    // track + progress
+    c.fillStyle = C.track; rr(ox, oy + 140, tw, 14, 7); c.fill();
+    if (endT > 0) { c.fillStyle = C.fill; rr(ox, oy + 140, X(endT) - ox, 14, 7); c.fill(); }
+
+    // ticks and labels
+    font("400", 12.8);
+    for (var t = 0; t <= TOTAL; t += 10) {
+      var major = t % 30 === 0;
+      c.fillStyle = C.line;
+      c.fillRect(X(t) - 1, oy + 250, 2, major ? 13 : 7);
+      if (major) {
+        var lbl = fmt(t), lw = c.measureText(lbl).width;
+        var lx = t === 0 ? X(t) - 0.3 * lw : (t === TOTAL ? X(t) - 0.7 * lw : X(t) - 0.5 * lw);
+        text(lbl, lx, oy + 278, C.muted);
+      }
+    }
+
+    // gap brackets across the top
+    function bracket(x1, x2, len, color, dashed) {
+      c.fillStyle = color;
+      c.fillRect(x1 - 1, oy + 4, 2, 34);
+      c.fillRect(x2 - 1, oy + 4, 2, 34);
+      c.strokeStyle = color; c.lineWidth = 2;
+      if (dashed) c.setLineDash([6, 4]);
+      c.beginPath(); c.moveTo(x1, oy + 21); c.lineTo(x2, oy + 21); c.stroke();
+      c.setLineDash([]);
+      font("700", 15);
+      var label = len + "s", w = c.measureText(label).width + 20, cx = (x1 + x2) / 2;
+      c.fillStyle = C.white; rr(cx - w / 2, oy + 8, w, 26, 13); c.fill();
+      c.strokeStyle = color; c.lineWidth = 2; rr(cx - w / 2, oy + 8, w, 26, 13); c.stroke();
+      text(label, cx, oy + 26, C.ink, "center");
+    }
+    d.segs.forEach(function (sg) { bracket(X(sg.a.t), X(sg.b.t), sg.len, C.line, false); });
+    if (d.unused > 0) bracket(X(endT), X(TOTAL), d.unused, C.green, true);
+
+    // green end line
+    if (endedEarly) { c.fillStyle = C.green; c.fillRect(X(endT) - 2, oy + 108, 4, 78); }
+
+    // marks (same label staggering as the page)
+    var DOWN = [[8,0],[14,0],[14,17],[22,17],[11,32],[0,17],[8,17]];
+    var UP = [[8,32],[14,32],[14,15],[22,15],[11,0],[0,15],[8,15]];
+    var last = { "in": { t: -99, lvl: 1 }, "out": { t: -99, lvl: 1 } };
+    marks.forEach(function (m) {
+      var prev = last[m.dir];
+      var lvl = (m.t - prev.t <= 9) ? 1 - prev.lvl : 0;
+      last[m.dir] = { t: m.t, lvl: lvl };
+      var x = X(m.t), col = C[m.color], isIn = m.dir === "in";
+
+      if (lvl) {
+        c.globalAlpha = 0.5; c.fillStyle = col;
+        c.fillRect(x - 1, isIn ? oy + 68 : oy + 186, 2, isIn ? 40 : 36);
+        c.globalAlpha = 1;
+      }
+      var shape = isIn ? DOWN : UP, top = isIn ? oy + 108 : oy + 154;
+      c.fillStyle = col; c.beginPath();
+      shape.forEach(function (pt, i) {
+        if (i === 0) c.moveTo(x - 11 + pt[0], top + pt[1]); else c.lineTo(x - 11 + pt[0], top + pt[1]);
+      });
+      c.closePath(); c.fill();
+
+      font("700", 12.8);
+      var bt = fmt(m.t), bwid = c.measureText(bt).width + 18;
+      var by = isIn ? (lvl ? oy + 46 : oy + 76) : (lvl ? oy + 220 : oy + 190);
+      c.fillStyle = C.white; rr(x - bwid / 2, by, bwid, 22, 8); c.fill();
+      c.strokeStyle = col; c.lineWidth = 2; rr(x - bwid / 2, by, bwid, 22, 8); c.stroke();
+      text(bt, x, by + 16, C.ink, "center");
+    });
+
+    // results table
+    var COL = { type: 470, from: 640, to: 740, len: 840 };
+    font("700", 14);
+    text("Segment", M + 12, tableTop + 22, C.muted);
+    text("Type", COL.type, tableTop + 22, C.muted);
+    text("From", COL.from, tableTop + 22, C.muted);
+    text("To", COL.to, tableTop + 22, C.muted);
+    text("Length", COL.len, tableTop + 22, C.muted);
+    c.fillStyle = C.line; c.fillRect(M, tableTop + 35, W - 2 * M, 1);
+
+    function dotAt(x, y, color) { c.fillStyle = color; c.beginPath(); c.arc(x + 5, y, 5, 0, Math.PI * 2); c.fill(); }
+    function tableRow(i, aM, aName, bM, bName, type, from, to, len) {
+      var y = tableTop + 36 + i * 34, base = y + 22, x = M + 12;
+      font("400", 15);
+      dotAt(x, y + 17, colorOf(aM)); x += 16;
+      text(aName, x, base, C.ink); x += c.measureText(aName).width;
+      text(" to ", x, base, C.ink); x += c.measureText(" to ").width;
+      dotAt(x, y + 17, colorOf(bM)); x += 16;
+      text(bName, x, base, C.ink);
+      text(type, COL.type, base, C.ink);
+      text(fmt(from), COL.from, base, C.ink);
+      text(fmt(to), COL.to, base, C.ink);
+      font("700", 15);
+      text(len + " s", COL.len, base, C.ink);
+      c.fillStyle = C.line; c.fillRect(M, y + 33, W - 2 * M, 1);
+    }
+    d.segs.forEach(function (sg, i) {
+      tableRow(i, sg.a.m, sg.a.name, sg.b.m, sg.b.name, sg.type, sg.a.t, sg.b.t, sg.len);
+    });
+    if (d.unused > 0) {
+      var i2 = d.segs.length, y2 = tableTop + 36 + i2 * 34, b2 = y2 + 22;
+      font("400", 15);
+      dotAt(M + 12, y2 + 17, C.muted);
+      text("End timer to 2:30", M + 28, b2, C.ink);
+      text("Unused Time", COL.type, b2, C.ink);
+      text(fmt(endT), COL.from, b2, C.ink);
+      text(fmt(TOTAL), COL.to, b2, C.ink);
+      font("700", 15);
+      text(d.unused + " s", COL.len, b2, C.ink);
+      c.fillStyle = C.line; c.fillRect(M, y2 + 33, W - 2 * M, 1);
+    }
+    var ty = tableTop + 36 + rows * 34;
+    font("700", 15);
+    text("Total", M + 12, ty + 24, C.ink);
+    text(TOTAL + " s", COL.len, ty + 24, C.ink);
+
+    // save as JPEG
+    var now = new Date();
+    function two(n) { return (n < 10 ? "0" : "") + n; }
+    var name = "timeline-" + now.getFullYear() + "-" + two(now.getMonth() + 1) + "-" + two(now.getDate()) +
+               "_" + two(now.getHours()) + two(now.getMinutes()) + ".jpg";
+    cv.toBlob(function (blob) {
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }, "image/jpeg", 0.92);
+  }
+
+  function reset() {
+    clearInterval(timerId);
+    status = "idle";
+    marks = [];
+    renderMarks();
+    clearGaps();
+    setReadout(0);
+    fill.style.width = "0%";
+    refreshButtons();
+    undoBtn.disabled = true;
+    endBtn.disabled = true;
+    downloadBtn.disabled = true;
+    resetBtn.disabled = true;
+    endedEarly = false;
+    endT = TOTAL;
+    hint.textContent = "Press Red Out or Blue Out (or key 2 or 4) to start the timer.";
+  }
+
+  downloadBtn.addEventListener("click", downloadImage);
+  endBtn.addEventListener("click", function () { if (status === "running") finish(true); });
+  undoBtn.addEventListener("click", undo);
+  resetBtn.addEventListener("click", reset);
+  eventBtns.forEach(function (b) {
+    b.addEventListener("click", function () { addMark(b.dataset.color, b.dataset.dir); });
+  });
+
+  // Keys 1 to 4 mark events while running, so you don't need to look at the screen.
+  document.addEventListener("keydown", function (e) {
+    if ((status !== "running" && status !== "idle") || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = KEYS[e.key];
+    if (k) { e.preventDefault(); addMark(k[0], k[1]); }
+  });
+
+  buildTicks();
+  refreshButtons();
+})();
+</script>
+</body>
+</html>
