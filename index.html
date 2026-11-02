@@ -17,6 +17,7 @@
     --red: #c81d2e;
     --blue: #1a56c4;
     --green: #0f7a43;
+    --pit: #e6dcf7;
     --on-color: #ffffff;
   }
   @media (prefers-color-scheme: dark) {
@@ -32,6 +33,7 @@
       --red: #ff6b78;
       --blue: #6aa5ff;
       --green: #4fd08a;
+      --pit: #43355f;
       --on-color: #10161c;
     }
   }
@@ -328,6 +330,7 @@
   th { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
   td.dur { font-weight: 700; }
   tr.total td { border-bottom: 0; font-weight: 700; }
+  tr.pit td { background: var(--pit); }
   .dot {
     display: inline-block;
     width: 10px; height: 10px;
@@ -405,7 +408,7 @@
     <h2>Results</h2>
     <div class="summary" id="summary"></div>
     <table>
-      <thead><tr><th>Segment</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead>
+      <thead><tr><th>Segment</th><th>Type</th><th>Length</th></tr></thead>
       <tbody id="resultsBody"></tbody>
     </table>
   </section>
@@ -526,8 +529,8 @@
 
       gapHtml += '<div class="gap" style="left:' + pct(a.t) + ";width:" + (len / TOTAL * 100) +
                  '%"><span>' + len + "s</span></div>";
-      rows += "<tr><td>" + dot(a.m) + a.name + " to " + dot(b.m) + b.name + "</td><td>" + type +
-              "</td><td>" + fmt(a.t) + "</td><td>" + fmt(b.t) + '</td><td class="dur">' + len + " s</td></tr>";
+      rows += "<tr" + (type === "Pit" ? ' class="pit"' : "") + "><td>" + dot(a.m) + a.name + " to " + dot(b.m) +
+              b.name + "</td><td>" + type + '</td><td class="dur">' + len + " s</td></tr>";
     }
 
     // Unused Time: whatever is left after the green end timer line.
@@ -535,13 +538,12 @@
     if (unused > 0) {
       gapHtml += '<div class="gap unused" style="left:' + pct(endT) + ";width:" + (unused / TOTAL * 100) +
                  '%"><span>' + unused + "s</span></div>";
-      rows += "<tr><td>" + dot(null) + "End timer to 2:30</td><td>Unused Time</td><td>" + fmt(endT) +
-              "</td><td>" + fmt(TOTAL) + '</td><td class="dur">' + unused + " s</td></tr>";
+      rows += "<tr><td>" + dot(null) + 'End timer to 2:30</td><td>Unused Time</td><td class="dur">' + unused + " s</td></tr>";
     }
 
     gapsEl.innerHTML = gapHtml;
     resultsBody.innerHTML = rows +
-      '<tr class="total"><td>Total</td><td></td><td></td><td></td><td>' + TOTAL + " s</td></tr>";
+      '<tr class="total"><td>Total</td><td></td><td>' + TOTAL + " s</td></tr>";
 
     var avg = pitCount ? Math.round(pit / pitCount * 10) / 10 : null;
     function plural(n, w) { return n + " " + w + (n === 1 ? "" : "s"); }
@@ -675,7 +677,7 @@
     var d = analyze();
 
     var C = { ink: "#12263a", muted: "#5b6e7f", panel: "#f1f5f8", track: "#c5d1da", fill: "#8aa3b5",
-              line: "#b3c2ce", white: "#ffffff", red: "#c81d2e", blue: "#1a56c4", green: "#0f7a43" };
+              line: "#b3c2ce", pit: "#e6dcf7", white: "#ffffff", red: "#c81d2e", blue: "#1a56c4", green: "#0f7a43" };
     var FF = 'ui-rounded, "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif';
     var S = 2, W = 1000, M = 32;
     var rows = d.segs.length + (d.unused > 0 ? 1 : 0);
@@ -810,18 +812,17 @@
     });
 
     // results table
-    var COL = { type: 470, from: 640, to: 740, len: 840 };
+    var COL = { type: 560, len: 820 };
     font("700", 14);
     text("Segment", M + 12, tableTop + 22, C.muted);
     text("Type", COL.type, tableTop + 22, C.muted);
-    text("From", COL.from, tableTop + 22, C.muted);
-    text("To", COL.to, tableTop + 22, C.muted);
     text("Length", COL.len, tableTop + 22, C.muted);
     c.fillStyle = C.line; c.fillRect(M, tableTop + 35, W - 2 * M, 1);
 
     function dotAt(x, y, color) { c.fillStyle = color; c.beginPath(); c.arc(x + 5, y, 5, 0, Math.PI * 2); c.fill(); }
     function tableRow(i, aM, aName, bM, bName, type, from, to, len) {
       var y = tableTop + 36 + i * 34, base = y + 22, x = M + 12;
+      if (type === "Pit") { c.fillStyle = C.pit; c.fillRect(M, y, W - 2 * M, 33); }
       font("400", 15);
       dotAt(x, y + 17, colorOf(aM)); x += 16;
       text(aName, x, base, C.ink); x += c.measureText(aName).width;
@@ -829,8 +830,6 @@
       dotAt(x, y + 17, colorOf(bM)); x += 16;
       text(bName, x, base, C.ink);
       text(type, COL.type, base, C.ink);
-      text(fmt(from), COL.from, base, C.ink);
-      text(fmt(to), COL.to, base, C.ink);
       font("700", 15);
       text(len + " s", COL.len, base, C.ink);
       c.fillStyle = C.line; c.fillRect(M, y + 33, W - 2 * M, 1);
@@ -844,8 +843,6 @@
       dotAt(M + 12, y2 + 17, C.muted);
       text("End timer to 2:30", M + 28, b2, C.ink);
       text("Unused Time", COL.type, b2, C.ink);
-      text(fmt(endT), COL.from, b2, C.ink);
-      text(fmt(TOTAL), COL.to, b2, C.ink);
       font("700", 15);
       text(d.unused + " s", COL.len, b2, C.ink);
       c.fillStyle = C.line; c.fillRect(M, y2 + 33, W - 2 * M, 1);
