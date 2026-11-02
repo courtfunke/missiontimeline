@@ -93,6 +93,28 @@
   button:disabled { opacity: 0.35; cursor: not-allowed; }
   button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
+  .team {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    margin-bottom: 20px;
+  }
+  .team label { font-weight: 600; color: var(--muted); }
+  .team select {
+    font: inherit;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--panel);
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-height: 48px;
+    min-width: 280px;
+    max-width: 100%;
+  }
+  .team select:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
   .events {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -329,6 +351,11 @@
 <main>
   <h1>Timeline timer: 2:30</h1>
 
+  <div class="team">
+    <label for="teamSelect">Team</label>
+    <select id="teamSelect"></select>
+  </div>
+
   <section class="clock">
     <div class="readout" id="readout" aria-label="Elapsed time">0:00<small>of 2:30</small></div>
     <div class="controls">
@@ -388,9 +415,30 @@
 (function () {
   var TOTAL = 150; // seconds (2:30)
 
+  // Edit this list to add, remove or rename teams.
+  var TEAMS = [
+    "Apex-GPT",
+    "Automatrons",
+    "Biobots",
+    "Canopy Coders",
+    "Codebreakers",
+    "Cybertronic",
+    "Duckzilla",
+    "Error 404: Chicken Not Found",
+    "Headless Chickens",
+    "Legacy Builders",
+    "MARS Eagles (The)",
+    "Master KARDS",
+    "Phoenix Phorce",
+    "Roz",
+    "Short Circuit",
+    "Solar Stars",
+    "Terrabyte Titans"
+  ];
+
   var $ = function (id) { return document.getElementById(id); };
   var readout = $("readout"),
-      endBtn = $("endBtn"), downloadBtn = $("downloadBtn"), endLine = $("endLine"), undoBtn = $("undoBtn"), resetBtn = $("resetBtn"), hint = $("hint"),
+      teamSel = $("teamSelect"), endBtn = $("endBtn"), downloadBtn = $("downloadBtn"), endLine = $("endLine"), undoBtn = $("undoBtn"), resetBtn = $("resetBtn"), hint = $("hint"),
       fill = $("fill"), ticksEl = $("ticks"), gapsEl = $("gaps"), marksEl = $("marks"),
       results = $("results"), resultsBody = $("resultsBody"), summaryEl = $("summary");
   var eventBtns = Array.prototype.slice.call(document.querySelectorAll(".event-btn"));
@@ -662,12 +710,14 @@
     c.fillRect(0, 0, W, H);
 
     // title
-    font("700", 22);
-    text("Timeline timer: 2:30", M, 46, C.ink);
+    var team = teamSel.value;
+    var endNote = endedEarly ? "Timer ended early at " + fmt(endT) : "Timer ran the full 2:30";
+    font("700", 26);
+    text(team || "Timeline timer: 2:30", M, 46, C.ink);
     font("400", 14);
     text(new Date().toLocaleString(), W - M, 46, C.muted, "right");
     font("400", 15);
-    text(endedEarly ? "Timer ended early at " + fmt(endT) : "Timer ran the full 2:30", M, 68, C.muted);
+    text(team ? "Timeline timer: 2:30  \u00b7  " + endNote : endNote, M, 68, C.muted);
 
     // summary boxes
     var stats = [
@@ -808,7 +858,8 @@
     // save as JPEG
     var now = new Date();
     function two(n) { return (n < 10 ? "0" : "") + n; }
-    var name = "timeline-" + now.getFullYear() + "-" + two(now.getMonth() + 1) + "-" + two(now.getDate()) +
+    var teamPart = team ? team.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-" : "";
+    var name = "timeline-" + teamPart + now.getFullYear() + "-" + two(now.getMonth() + 1) + "-" + two(now.getDate()) +
                "_" + two(now.getHours()) + two(now.getMinutes()) + ".jpg";
     cv.toBlob(function (blob) {
       if (!blob) return;
@@ -854,6 +905,25 @@
     if ((status !== "running" && status !== "idle") || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     var k = KEYS[e.key];
     if (k) { e.preventDefault(); addMark(k[0], k[1]); }
+  });
+
+  // Team drop-down (remembers the last choice on this device)
+  var blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "Select a team";
+  teamSel.appendChild(blank);
+  TEAMS.forEach(function (t) {
+    var o = document.createElement("option");
+    o.value = t;
+    o.textContent = t;
+    teamSel.appendChild(o);
+  });
+  try {
+    var saved = localStorage.getItem("timelineTimerTeam");
+    if (saved && TEAMS.indexOf(saved) !== -1) teamSel.value = saved;
+  } catch (e) {}
+  teamSel.addEventListener("change", function () {
+    try { localStorage.setItem("timelineTimerTeam", teamSel.value); } catch (e) {}
   });
 
   buildTicks();
