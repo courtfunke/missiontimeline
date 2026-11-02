@@ -523,13 +523,13 @@
 
     for (var i = 0; i < pts.length - 1; i++) {
       var a = pts[i], b = pts[i + 1], len = b.t - a.t;
-      // An up arrow starts a Mission; a down arrow starts a Pit.
-      var type = a.m.dir === "out" ? "Mission" : "Pit";
+      // An up arrow starts a Mission; a down arrow starts a Launch.
+      var type = a.m.dir === "out" ? "Mission" : "Launch";
       if (type === "Mission") { mission += len; missionCount++; } else { pit += len; pitCount++; }
 
       gapHtml += '<div class="gap" style="left:' + pct(a.t) + ";width:" + (len / TOTAL * 100) +
                  '%"><span>' + len + "s</span></div>";
-      rows += "<tr" + (type === "Pit" ? ' class="pit"' : "") + "><td>" + dot(a.m) + a.name + " to " + dot(b.m) +
+      rows += "<tr" + (type === "Launch" ? ' class="pit"' : "") + "><td>" + dot(a.m) + a.name + " to " + dot(b.m) +
               b.name + "</td><td>" + type + '</td><td class="dur">' + len + " s</td></tr>";
     }
 
@@ -546,16 +546,16 @@
       '<tr class="total"><td>Total</td><td></td><td>' + TOTAL + " s</td></tr>";
 
     var avg = pitCount ? Math.round(pit / pitCount * 10) / 10 : null;
-    function plural(n, w) { return n + " " + w + (n === 1 ? "" : "s"); }
+    function plural(n, w) { return n + " " + w + (n === 1 ? "" : (/ch$/.test(w) ? "es" : "s")); }
     function stat(value, name, note) {
       return '<div class="stat"><div class="stat-value">' + value + '</div><div class="stat-label">' +
              name + '</div><div class="stat-note">' + note + "</div></div>";
     }
     summaryEl.innerHTML =
       stat(mission + " s", "Mission", plural(missionCount, "Mission")) +
-      stat(pit + " s", "Pit", plural(pitCount, "Pit")) +
+      stat(pit + " s", "Launch", plural(pitCount, "Launch")) +
       stat(unused + " s", "Unused Time", endedEarly ? "after the green line" : "timer ran the full 2:30") +
-      stat(avg === null ? "none" : avg + " s", "Average Pit", avg === null ? "no Pits yet" : "across " + plural(pitCount, "Pit"));
+      stat(avg === null ? "none" : avg + " s", "Average Launch", avg === null ? "no Launches yet" : "across " + plural(pitCount, "Launch"));
 
     results.hidden = false;
   }
@@ -661,7 +661,7 @@
     var segs = [], mission = 0, pit = 0, mc = 0, pc = 0;
     for (var i = 0; i < pts.length - 1; i++) {
       var a = pts[i], b = pts[i + 1], len = b.t - a.t;
-      var type = a.m.dir === "out" ? "Mission" : "Pit";
+      var type = a.m.dir === "out" ? "Mission" : "Launch";
       if (type === "Mission") { mission += len; mc++; } else { pit += len; pc++; }
       segs.push({ a: a, b: b, len: len, type: type });
     }
@@ -724,9 +724,9 @@
     // summary boxes
     var stats = [
       [d.mission + " s", "Mission", d.mc + (d.mc === 1 ? " Mission" : " Missions")],
-      [d.pit + " s", "Pit", d.pc + (d.pc === 1 ? " Pit" : " Pits")],
+      [d.pit + " s", "Launch", d.pc + (d.pc === 1 ? " Launch" : " Launches")],
       [d.unused + " s", "Unused Time", endedEarly ? "after the green line" : "timer ran the full 2:30"],
-      [d.avg === null ? "none" : d.avg + " s", "Average Pit", d.avg === null ? "no Pits yet" : "across " + d.pc + (d.pc === 1 ? " Pit" : " Pits")]
+      [d.avg === null ? "none" : d.avg + " s", "Average Launch", d.avg === null ? "no Launches yet" : "across " + d.pc + (d.pc === 1 ? " Launch" : " Launches")]
     ];
     var bw = (W - 2 * M - 3 * 12) / 4;
     stats.forEach(function (st, i) {
@@ -822,7 +822,7 @@
     function dotAt(x, y, color) { c.fillStyle = color; c.beginPath(); c.arc(x + 5, y, 5, 0, Math.PI * 2); c.fill(); }
     function tableRow(i, aM, aName, bM, bName, type, from, to, len) {
       var y = tableTop + 36 + i * 34, base = y + 22, x = M + 12;
-      if (type === "Pit") { c.fillStyle = C.pit; c.fillRect(M, y, W - 2 * M, 33); }
+      if (type === "Launch") { c.fillStyle = C.pit; c.fillRect(M, y, W - 2 * M, 33); }
       font("400", 15);
       dotAt(x, y + 17, colorOf(aM)); x += 16;
       text(aName, x, base, C.ink); x += c.measureText(aName).width;
